@@ -2,9 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(target_os = "macos")]
 extern crate relaunch;
-
+#[cfg(target_os = "macos")]
 use relaunch::Trampoline;
+
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoopBuilder},
