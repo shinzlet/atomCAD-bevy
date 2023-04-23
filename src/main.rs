@@ -7,6 +7,16 @@ extern crate relaunch;
 #[cfg(target_os = "macos")]
 use relaunch::Trampoline;
 
+#[cfg(target_os = "macos")]
+#[macro_use]
+extern crate objc;
+#[cfg(target_os = "macos")]
+use objc::rc::autoreleasepool;
+#[cfg(target_os = "macos")]
+use objc::runtime::Object;
+
+#[cfg(target_os = "macos")]
+use winit::platform::macos::EventLoopBuilderExtMacOS;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoopBuilder},
@@ -21,7 +31,7 @@ fn main() {
     // because many Cocoa APIs will not work unless the application is running
     // from a bundle.
     #[cfg(target_os = "macos")]
-    let _ =
+    let app =
         match Trampoline::new(&APP_NAME, "io.atomcad.atomCAD").bundle(relaunch::InstallDir::Temp) {
             Err(e) => {
                 // We can't read/write to the filesystem?  This is a fatal error.
@@ -33,7 +43,89 @@ fn main() {
 
     // Create the event loop.
     let mut event_loop = EventLoopBuilder::new();
+    #[cfg(target_os = "macos")]
+    event_loop.with_default_menu(false);
     let event_loop = event_loop.build();
+
+    // Create the menu on macOS using Cocoa APIs.
+    #[cfg(target_os = "macos")]
+    autoreleasepool(|| unsafe {
+        // Empty string (for various uses).
+        let empty: *mut Object = msg_send![class![NSString], alloc];
+        let empty: *mut Object = msg_send![empty, init];
+        let empty: *mut Object = msg_send![empty, autorelease];
+
+        // Create the application menu bar.
+        let appname: *mut Object = msg_send![class![NSString], alloc];
+        let appname: *mut Object = msg_send![appname,
+                                             initWithBytes: APP_NAME.as_ptr()
+                                             length: APP_NAME.len()
+                                             encoding: 4]; // UTF-8
+        let appname: *mut Object = msg_send![appname, autorelease];
+
+        let mainmenu: *mut Object = msg_send![class![NSMenu], alloc];
+        let mainmenu: *mut Object = msg_send![mainmenu, initWithTitle: appname];
+        let mainmenu: *mut Object = msg_send![mainmenu, autorelease];
+
+        let appmenuitem: *mut Object = msg_send![class![NSMenuItem], alloc];
+        let appmenuitem: *mut Object = msg_send![appmenuitem, init];
+        let appmenuitem: *mut Object = msg_send![appmenuitem, autorelease];
+
+        let _: () = msg_send![mainmenu, addItem: appmenuitem];
+        let _: () = msg_send![app.app, setMainMenu: mainmenu];
+
+        // "About atomCAD"
+        let s = format!("About {}", APP_NAME);
+        let aboutmsg: *mut Object = msg_send![class![NSString], alloc];
+        let aboutmsg: *mut Object = msg_send![aboutmsg,
+                                              initWithBytes: s.as_ptr()
+                                              length: s.len()
+                                              encoding: 4]; // UTF-8
+        let aboutmsg: *mut Object = msg_send![aboutmsg, autorelease];
+
+        let aboutitem: *mut Object = msg_send![class![NSMenuItem], alloc];
+        let aboutitem: *mut Object = msg_send![aboutitem,
+                                               initWithTitle: aboutmsg
+                                               action: sel!(orderFrontStandardAboutPanel:)
+                                               keyEquivalent: empty];
+        let aboutitem: *mut Object = msg_send![aboutitem, autorelease];
+
+        // "Quit atomCAD [⌘Q]"
+        let s = format!("Quit {}", APP_NAME);
+        let quitmsg: *mut Object = msg_send![class![NSString], alloc];
+        let quitmsg: *mut Object = msg_send![quitmsg,
+                                             initWithBytes: s.as_ptr()
+                                             length: s.len()
+                                             encoding: 4]; // UTF-8
+        let quitmsg: *mut Object = msg_send![quitmsg, autorelease];
+
+        let s = "q"; // ⌘-q shortcut
+        let quitkey: *mut Object = msg_send![class![NSString], alloc];
+        let quitkey: *mut Object = msg_send![quitkey,
+                                             initWithBytes: s.as_ptr()
+                                             length: s.len()
+                                             encoding: 4]; // UTF-8
+        let quitkey: *mut Object = msg_send![quitkey, autorelease];
+
+        let quititem: *mut Object = msg_send![class![NSMenuItem], alloc];
+        let quititem: *mut Object = msg_send![quititem,
+                                              initWithTitle: quitmsg
+                                              action: sel!(terminate:)
+                                              keyEquivalent: quitkey];
+        let quititem: *mut Object = msg_send![quititem, autorelease];
+
+        // Create the “atomCAD” application menu.
+        let atomcadmenu: *mut Object = msg_send![class![NSMenu], alloc];
+        let atomcadmenu: *mut Object = msg_send![atomcadmenu, init];
+        let atomcadmenu: *mut Object = msg_send![atomcadmenu, autorelease];
+
+        // Add “atomCAD” application menu.
+        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
+        let _: () = msg_send![atomcadmenu, addItem: aboutitem];
+        let _: () = msg_send![atomcadmenu, addItem: sep];
+        let _: () = msg_send![atomcadmenu, addItem: quititem];
+        let _: () = msg_send![appmenuitem, setSubmenu: atomcadmenu];
+    });
 
     // Create the main window.
     let mut window = match WindowBuilder::new().with_title(APP_NAME).build(&event_loop) {
