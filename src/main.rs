@@ -136,6 +136,71 @@ fn main() {
         let servicesitem: *mut Object = msg_send![servicesitem, autorelease];
         let _: () = msg_send![servicesitem, setSubmenu: servicesmenu];
 
+        // "Hide atomCAD [⌘H]"
+        let s = format!("Hide {}", APP_NAME);
+        let hidemsg: *mut Object = msg_send![class![NSString], alloc];
+        let hidemsg: *mut Object = msg_send![hidemsg,
+                                             initWithBytes: s.as_ptr()
+                                             length: s.len()
+                                             encoding: 4]; // UTF-8
+        let hidemsg: *mut Object = msg_send![hidemsg, autorelease];
+
+        let s = "h"; // ⌘-h shortcut
+        let hidekey: *mut Object = msg_send![class![NSString], alloc];
+        let hidekey: *mut Object = msg_send![hidekey,
+                                             initWithBytes: s.as_ptr()
+                                             length: s.len()
+                                             encoding: 4]; // UTF-8
+        let hidekey: *mut Object = msg_send![hidekey, autorelease];
+
+        let hideitem: *mut Object = msg_send![class![NSMenuItem], alloc];
+        let hideitem: *mut Object = msg_send![hideitem,
+                                              initWithTitle: hidemsg
+                                              action: sel!(hide:)
+                                              keyEquivalent: hidekey];
+        let hideitem: *mut Object = msg_send![hideitem, autorelease];
+
+        // "Hide Others [⌥⌘H]"
+        let s = "Hide Others";
+        let hideothersmsg: *mut Object = msg_send![class![NSString], alloc];
+        let hideothersmsg: *mut Object = msg_send![hideothersmsg,
+                                                   initWithBytes: s.as_ptr()
+                                                   length: s.len()
+                                                   encoding: 4]; // UTF-8
+        let hideothersmsg: *mut Object = msg_send![hideothersmsg, autorelease];
+
+        let s = "h"; // ⌘-h shortcut
+        let hideotherskey: *mut Object = msg_send![class![NSString], alloc];
+        let hideotherskey: *mut Object = msg_send![hideotherskey,
+                                                   initWithBytes: s.as_ptr()
+                                                   length: s.len()
+                                                   encoding: 4]; // UTF-8
+        let hideotherskey: *mut Object = msg_send![hideotherskey, autorelease];
+
+        let hideothersitem: *mut Object = msg_send![class![NSMenuItem], alloc];
+        let hideothersitem: *mut Object = msg_send![hideothersitem,
+                                                    initWithTitle: hideothersmsg
+                                                    action: sel!(hideOtherApplications:)
+                                                    keyEquivalent: hideotherskey];
+        let _: () = msg_send![hideothersitem, setKeyEquivalentModifierMask: 0x180000]; // ⌥⌘
+        let hideothersitem: *mut Object = msg_send![hideothersitem, autorelease];
+
+        // "Show All"
+        let s = "Show All";
+        let showallmsg: *mut Object = msg_send![class![NSString], alloc];
+        let showallmsg: *mut Object = msg_send![showallmsg,
+                                                initWithBytes: s.as_ptr()
+                                                length: s.len()
+                                                encoding: 4]; // UTF-8
+        let showallmsg: *mut Object = msg_send![showallmsg, autorelease];
+
+        let showallitem: *mut Object = msg_send![class![NSMenuItem], alloc];
+        let showallitem: *mut Object = msg_send![showallitem,
+                                                 initWithTitle: showallmsg
+                                                 action: sel!(unhideAllApplications:)
+                                                 keyEquivalent: empty];
+        let showallitem: *mut Object = msg_send![showallitem, autorelease];
+
         // "Quit atomCAD [⌘Q]"
         let s = format!("Quit {}", APP_NAME);
         let quitmsg: *mut Object = msg_send![class![NSString], alloc];
@@ -173,6 +238,11 @@ fn main() {
         let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
         let _: () = msg_send![atomcadmenu, addItem: sep];
         let _: () = msg_send![atomcadmenu, addItem: servicesitem];
+        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
+        let _: () = msg_send![atomcadmenu, addItem: sep];
+        let _: () = msg_send![atomcadmenu, addItem: hideitem];
+        let _: () = msg_send![atomcadmenu, addItem: hideothersitem];
+        let _: () = msg_send![atomcadmenu, addItem: showallitem];
         let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
         let _: () = msg_send![atomcadmenu, addItem: sep];
         let _: () = msg_send![atomcadmenu, addItem: quititem];
