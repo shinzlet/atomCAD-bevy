@@ -90,6 +90,30 @@ fn main() {
                                                keyEquivalent: empty];
         let aboutitem: *mut Object = msg_send![aboutitem, autorelease];
 
+        // "Settings... [⌘,]"
+        let s = "Settings...";
+        let settingsmsg: *mut Object = msg_send![class![NSString], alloc];
+        let settingsmsg: *mut Object = msg_send![settingsmsg,
+                                                 initWithBytes: s.as_ptr()
+                                                 length: s.len()
+                                                 encoding: 4]; // UTF-8
+        let settingsmsg: *mut Object = msg_send![settingsmsg, autorelease];
+
+        let s = ","; // ⌘-, shortcut
+        let settingskey: *mut Object = msg_send![class![NSString], alloc];
+        let settingskey: *mut Object = msg_send![settingskey,
+                                                 initWithBytes: s.as_ptr()
+                                                 length: s.len()
+                                                 encoding: 4]; // UTF-8
+        let settingskey: *mut Object = msg_send![settingskey, autorelease];
+
+        let settingsitem: *mut Object = msg_send![class![NSMenuItem], alloc];
+        let settingsitem: *mut Object = msg_send![settingsitem,
+                                                  initWithTitle: settingsmsg
+                                                  action: 0
+                                                  keyEquivalent: settingskey];
+        let settingsitem: *mut Object = msg_send![settingsitem, autorelease];
+
         // "Quit atomCAD [⌘Q]"
         let s = format!("Quit {}", APP_NAME);
         let quitmsg: *mut Object = msg_send![class![NSString], alloc];
@@ -120,8 +144,11 @@ fn main() {
         let atomcadmenu: *mut Object = msg_send![atomcadmenu, autorelease];
 
         // Add “atomCAD” application menu.
-        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
         let _: () = msg_send![atomcadmenu, addItem: aboutitem];
+        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
+        let _: () = msg_send![atomcadmenu, addItem: sep];
+        let _: () = msg_send![atomcadmenu, addItem: settingsitem];
+        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
         let _: () = msg_send![atomcadmenu, addItem: sep];
         let _: () = msg_send![atomcadmenu, addItem: quititem];
         let _: () = msg_send![appmenuitem, setSubmenu: atomcadmenu];
