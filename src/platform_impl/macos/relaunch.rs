@@ -4,13 +4,11 @@
 
 extern crate relaunch;
 
-use std::io::Error as IOError;
-
 pub struct Trampoline;
 pub use relaunch::Application;
 
 impl Trampoline {
-    pub fn new(name: &str, ident: &str, version: &str) -> Result<Application, IOError> {
+    pub fn new(name: &str, ident: &str, version: &str) -> Result<Application, std::io::Error> {
         relaunch::Trampoline::new(name, ident)
             .version(version)
             .bundle(relaunch::InstallDir::Temp)
