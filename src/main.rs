@@ -31,15 +31,17 @@ fn main() {
     // because many Cocoa APIs will not work unless the application is running
     // from a bundle.
     #[cfg(target_os = "macos")]
-    let app =
-        match Trampoline::new(&APP_NAME, "io.atomcad.atomCAD").bundle(relaunch::InstallDir::Temp) {
-            Err(e) => {
-                // We can't read/write to the filesystem?  This is a fatal error.
-                println!("IO error! {}", e);
-                std::process::exit(1);
-            }
-            Ok(app) => app,
-        };
+    let app = match Trampoline::new(&APP_NAME, "io.atomcad.atomCAD")
+        .version(env!("CARGO_PKG_VERSION"))
+        .bundle(relaunch::InstallDir::Temp)
+    {
+        Err(e) => {
+            // We can't read/write to the filesystem?  This is a fatal error.
+            println!("IO error! {}", e);
+            std::process::exit(1);
+        }
+        Ok(app) => app,
+    };
 
     // Create the event loop.
     let mut event_loop = EventLoopBuilder::new();
