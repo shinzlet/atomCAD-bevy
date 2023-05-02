@@ -12,16 +12,4 @@ pub mod windows;
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
 
-use crate::platform_impl;
-use std::io::Error as IOError;
-
-pub struct Trampoline;
-pub use platform_impl::relaunch::Application;
-
-impl Trampoline {
-    pub fn new(name: &str, ident: &str, version: &str) -> Result<Application, IOError> {
-        platform_impl::relaunch::Trampoline::new(name, ident, version)
-    }
-}
-
 // End of File

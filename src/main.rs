@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use atomcad::platform::Trampoline;
+use atomcad::platform::relaunch;
 
 #[cfg(target_os = "macos")]
 #[macro_use]
@@ -27,14 +27,16 @@ fn main() {
     // run`), relaunch as a dynamically created app bundle.  This currently
     // only has any effect on macOS, where it is required because many Cocoa
     // APIs will not work unless the application is running from a bundle.
-    let app = match Trampoline::new(&APP_NAME, "io.atomcad.atomCAD", env!("CARGO_PKG_VERSION")) {
-        Err(e) => {
-            // We can't read/write to the filesystem?  This is a fatal error.
-            println!("IO error! {}", e);
-            std::process::exit(1);
-        }
-        Ok(app) => app,
-    };
+    let app =
+        match relaunch::Trampoline::new(&APP_NAME, "io.atomcad.atomCAD", env!("CARGO_PKG_VERSION"))
+        {
+            Err(e) => {
+                // We can't read/write to the filesystem?  This is a fatal error.
+                println!("IO error! {}", e);
+                std::process::exit(1);
+            }
+            Ok(app) => app,
+        };
 
     // Create the event loop.
     let mut event_loop = EventLoopBuilder::new();
