@@ -2,14 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[cfg(target_os = "macos")]
-pub mod macos;
-#[cfg(target_os = "macos")]
-pub use self::macos::*;
+pub struct Trampoline;
+pub struct Application;
 
-#[cfg(target_os = "windows")]
-pub mod windows;
-#[cfg(target_os = "windows")]
-pub use self::windows::*;
+impl Trampoline {
+    pub fn new(_name: &str, _ident: &str, _version: &str) -> Result<Application, std::io::Error> {
+        Ok(Application)
+    }
+}
 
 // End of File
