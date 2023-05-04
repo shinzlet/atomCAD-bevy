@@ -12,41 +12,19 @@ use objc::rc::autoreleasepool;
 #[cfg(target_os = "macos")]
 use objc::runtime::Object;
 
-#[cfg(target_os = "macos")]
-use winit::platform::macos::EventLoopBuilderExtMacOS;
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, EventLoopBuilder},
     window::WindowBuilder,
 };
 
-fn main() {
-    const APP_NAME: &str = "atomCAD";
-
-    // If we are running from the command line (e.g. as a result of `cargo
-    // run`), relaunch as a dynamically created app bundle.  This currently
-    // only has any effect on macOS, where it is required because many Cocoa
-    // APIs will not work unless the application is running from a bundle.
-    let app =
-        match relaunch::Trampoline::new(&APP_NAME, "io.atomcad.atomCAD", env!("CARGO_PKG_VERSION"))
-        {
-            Err(e) => {
-                // We can't read/write to the filesystem?  This is a fatal error.
-                println!("IO error! {}", e);
-                std::process::exit(1);
-            }
-            Ok(app) => app,
-        };
-
-    // Create the event loop.
-    let mut event_loop = EventLoopBuilder::new();
-    #[cfg(target_os = "macos")]
-    event_loop.with_default_menu(false);
-    let event_loop = event_loop.build();
-
+fn replace_menu_bar(app_name: &str) {
     // Create the menu on macOS using Cocoa APIs.
     #[cfg(target_os = "macos")]
     autoreleasepool(|| unsafe {
+        // Get the application object.
+        let app: *mut Object = msg_send![class![NSApplication], sharedApplication];
+
         // Empty string (for various uses).
         let empty: *mut Object = msg_send![class![NSString], alloc];
         let empty: *mut Object = msg_send![empty, init];
@@ -55,8 +33,8 @@ fn main() {
         // Create the application menu bar.
         let appname: *mut Object = msg_send![class![NSString], alloc];
         let appname: *mut Object = msg_send![appname,
-                                             initWithBytes: APP_NAME.as_ptr()
-                                             length: APP_NAME.len()
+                                             initWithBytes: app_name.as_ptr()
+                                             length: app_name.len()
                                              encoding: 4]; // UTF-8
         let appname: *mut Object = msg_send![appname, autorelease];
 
@@ -69,10 +47,10 @@ fn main() {
         let appmenuitem: *mut Object = msg_send![appmenuitem, autorelease];
 
         let _: () = msg_send![mainmenu, addItem: appmenuitem];
-        let _: () = msg_send![app.app, setMainMenu: mainmenu];
+        let _: () = msg_send![app, setMainMenu: mainmenu];
 
         // "About atomCAD"
-        let s = format!("About {}", APP_NAME);
+        let s = format!("About {}", app_name);
         let aboutmsg: *mut Object = msg_send![class![NSString], alloc];
         let aboutmsg: *mut Object = msg_send![aboutmsg,
                                               initWithBytes: s.as_ptr()
@@ -115,7 +93,7 @@ fn main() {
         let servicesmenu: *mut Object = msg_send![class![NSMenu], alloc];
         let servicesmenu: *mut Object = msg_send![servicesmenu, init];
         let servicesmenu: *mut Object = msg_send![servicesmenu, autorelease];
-        let _: () = msg_send![app.app, setServicesMenu: servicesmenu];
+        let _: () = msg_send![app, setServicesMenu: servicesmenu];
 
         let s = "Services";
         let servicesmsg: *mut Object = msg_send![class![NSString], alloc];
@@ -134,7 +112,7 @@ fn main() {
         let _: () = msg_send![servicesitem, setSubmenu: servicesmenu];
 
         // "Hide atomCAD [⌘H]"
-        let s = format!("Hide {}", APP_NAME);
+        let s = format!("Hide {}", app_name);
         let hidemsg: *mut Object = msg_send![class![NSString], alloc];
         let hidemsg: *mut Object = msg_send![hidemsg,
                                              initWithBytes: s.as_ptr()
@@ -199,7 +177,7 @@ fn main() {
         let showallitem: *mut Object = msg_send![showallitem, autorelease];
 
         // "Quit atomCAD [⌘Q]"
-        let s = format!("Quit {}", APP_NAME);
+        let s = format!("Quit {}", app_name);
         let quitmsg: *mut Object = msg_send![class![NSString], alloc];
         let quitmsg: *mut Object = msg_send![quitmsg,
                                              initWithBytes: s.as_ptr()
@@ -245,6 +223,27 @@ fn main() {
         let _: () = msg_send![atomcadmenu, addItem: quititem];
         let _: () = msg_send![appmenuitem, setSubmenu: atomcadmenu];
     });
+}
+
+fn main() {
+    const APP_NAME: &str = "atomCAD";
+
+    // If we are running from the command line (e.g. as a result of `cargo
+    // run`), relaunch as a dynamically created app bundle.  This currently
+    // only has any effect on macOS, where it is required because many Cocoa
+    // APIs will not work unless the application is running from a bundle.
+    match relaunch::Trampoline::new(&APP_NAME, "io.atomcad.atomCAD", env!("CARGO_PKG_VERSION")) {
+        Err(e) => {
+            // We can't read/write to the filesystem?  This is a fatal error.
+            println!("IO error! {}", e);
+            std::process::exit(1);
+        }
+        Ok(app) => app,
+    };
+
+    // Create the event loop.
+    let mut event_loop = EventLoopBuilder::new();
+    let event_loop = event_loop.build();
 
     // Create the main window.
     let mut window = match WindowBuilder::new().with_title(APP_NAME).build(&event_loop) {
@@ -262,6 +261,10 @@ fn main() {
 
         // Handle events.
         match event {
+            Event::NewEvents(StartCause::Init) => {
+                // Will be called once when the event loop starts.
+                replace_menu_bar(APP_NAME);
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
