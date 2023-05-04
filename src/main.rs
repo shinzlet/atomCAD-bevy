@@ -18,6 +18,19 @@ use winit::{
     window::WindowBuilder,
 };
 
+fn nsstring(s: &str) -> *mut Object {
+    unsafe {
+        let cls = class!(NSString);
+        let bytes = s.as_ptr();
+        let len = s.len();
+        let encoding = 4; // UTF-8
+        let obj: *mut Object = msg_send![cls, alloc];
+        let obj: *mut Object = msg_send![obj, initWithBytes:bytes length:len encoding:encoding];
+        let obj: *mut Object = msg_send![obj, autorelease];
+        obj
+    }
+}
+
 fn replace_menu_bar(app_name: &str) {
     // Create the menu on macOS using Cocoa APIs.
     #[cfg(target_os = "macos")]
@@ -26,17 +39,10 @@ fn replace_menu_bar(app_name: &str) {
         let app: *mut Object = msg_send![class![NSApplication], sharedApplication];
 
         // Empty string (for various uses).
-        let empty: *mut Object = msg_send![class![NSString], alloc];
-        let empty: *mut Object = msg_send![empty, init];
-        let empty: *mut Object = msg_send![empty, autorelease];
+        let empty = nsstring("");
 
         // Create the application menu bar.
-        let appname: *mut Object = msg_send![class![NSString], alloc];
-        let appname: *mut Object = msg_send![appname,
-                                             initWithBytes: app_name.as_ptr()
-                                             length: app_name.len()
-                                             encoding: 4]; // UTF-8
-        let appname: *mut Object = msg_send![appname, autorelease];
+        let appname = nsstring(app_name);
 
         let mainmenu: *mut Object = msg_send![class![NSMenu], alloc];
         let mainmenu: *mut Object = msg_send![mainmenu, initWithTitle: appname];
@@ -50,13 +56,7 @@ fn replace_menu_bar(app_name: &str) {
         let _: () = msg_send![app, setMainMenu: mainmenu];
 
         // "About atomCAD"
-        let s = format!("About {}", app_name);
-        let aboutmsg: *mut Object = msg_send![class![NSString], alloc];
-        let aboutmsg: *mut Object = msg_send![aboutmsg,
-                                              initWithBytes: s.as_ptr()
-                                              length: s.len()
-                                              encoding: 4]; // UTF-8
-        let aboutmsg: *mut Object = msg_send![aboutmsg, autorelease];
+        let aboutmsg = nsstring(&format!("About {}", app_name));
 
         let aboutitem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let aboutitem: *mut Object = msg_send![aboutitem,
@@ -66,21 +66,8 @@ fn replace_menu_bar(app_name: &str) {
         let aboutitem: *mut Object = msg_send![aboutitem, autorelease];
 
         // "Settings... [⌘,]"
-        let s = "Settings...";
-        let settingsmsg: *mut Object = msg_send![class![NSString], alloc];
-        let settingsmsg: *mut Object = msg_send![settingsmsg,
-                                                 initWithBytes: s.as_ptr()
-                                                 length: s.len()
-                                                 encoding: 4]; // UTF-8
-        let settingsmsg: *mut Object = msg_send![settingsmsg, autorelease];
-
-        let s = ","; // ⌘-, shortcut
-        let settingskey: *mut Object = msg_send![class![NSString], alloc];
-        let settingskey: *mut Object = msg_send![settingskey,
-                                                 initWithBytes: s.as_ptr()
-                                                 length: s.len()
-                                                 encoding: 4]; // UTF-8
-        let settingskey: *mut Object = msg_send![settingskey, autorelease];
+        let settingsmsg = nsstring("Settings...");
+        let settingskey = nsstring(",");
 
         let settingsitem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let settingsitem: *mut Object = msg_send![settingsitem,
@@ -95,13 +82,7 @@ fn replace_menu_bar(app_name: &str) {
         let servicesmenu: *mut Object = msg_send![servicesmenu, autorelease];
         let _: () = msg_send![app, setServicesMenu: servicesmenu];
 
-        let s = "Services";
-        let servicesmsg: *mut Object = msg_send![class![NSString], alloc];
-        let servicesmsg: *mut Object = msg_send![servicesmsg,
-                                                 initWithBytes: s.as_ptr()
-                                                 length: s.len()
-                                                 encoding: 4]; // UTF-8
-        let servicesmsg: *mut Object = msg_send![servicesmsg, autorelease];
+        let servicesmsg = nsstring("Services");
 
         let servicesitem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let servicesitem: *mut Object = msg_send![servicesitem,
@@ -112,21 +93,8 @@ fn replace_menu_bar(app_name: &str) {
         let _: () = msg_send![servicesitem, setSubmenu: servicesmenu];
 
         // "Hide atomCAD [⌘H]"
-        let s = format!("Hide {}", app_name);
-        let hidemsg: *mut Object = msg_send![class![NSString], alloc];
-        let hidemsg: *mut Object = msg_send![hidemsg,
-                                             initWithBytes: s.as_ptr()
-                                             length: s.len()
-                                             encoding: 4]; // UTF-8
-        let hidemsg: *mut Object = msg_send![hidemsg, autorelease];
-
-        let s = "h"; // ⌘-h shortcut
-        let hidekey: *mut Object = msg_send![class![NSString], alloc];
-        let hidekey: *mut Object = msg_send![hidekey,
-                                             initWithBytes: s.as_ptr()
-                                             length: s.len()
-                                             encoding: 4]; // UTF-8
-        let hidekey: *mut Object = msg_send![hidekey, autorelease];
+        let hidemsg = nsstring(&format!("Hide {}", app_name));
+        let hidekey = nsstring("h");
 
         let hideitem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let hideitem: *mut Object = msg_send![hideitem,
@@ -136,21 +104,8 @@ fn replace_menu_bar(app_name: &str) {
         let hideitem: *mut Object = msg_send![hideitem, autorelease];
 
         // "Hide Others [⌥⌘H]"
-        let s = "Hide Others";
-        let hideothersmsg: *mut Object = msg_send![class![NSString], alloc];
-        let hideothersmsg: *mut Object = msg_send![hideothersmsg,
-                                                   initWithBytes: s.as_ptr()
-                                                   length: s.len()
-                                                   encoding: 4]; // UTF-8
-        let hideothersmsg: *mut Object = msg_send![hideothersmsg, autorelease];
-
-        let s = "h"; // ⌘-h shortcut
-        let hideotherskey: *mut Object = msg_send![class![NSString], alloc];
-        let hideotherskey: *mut Object = msg_send![hideotherskey,
-                                                   initWithBytes: s.as_ptr()
-                                                   length: s.len()
-                                                   encoding: 4]; // UTF-8
-        let hideotherskey: *mut Object = msg_send![hideotherskey, autorelease];
+        let hideothersmsg = nsstring("Hide Others");
+        let hideotherskey = nsstring("h");
 
         let hideothersitem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let hideothersitem: *mut Object = msg_send![hideothersitem,
@@ -161,13 +116,7 @@ fn replace_menu_bar(app_name: &str) {
         let hideothersitem: *mut Object = msg_send![hideothersitem, autorelease];
 
         // "Show All"
-        let s = "Show All";
-        let showallmsg: *mut Object = msg_send![class![NSString], alloc];
-        let showallmsg: *mut Object = msg_send![showallmsg,
-                                                initWithBytes: s.as_ptr()
-                                                length: s.len()
-                                                encoding: 4]; // UTF-8
-        let showallmsg: *mut Object = msg_send![showallmsg, autorelease];
+        let showallmsg = nsstring("Show All");
 
         let showallitem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let showallitem: *mut Object = msg_send![showallitem,
@@ -177,21 +126,8 @@ fn replace_menu_bar(app_name: &str) {
         let showallitem: *mut Object = msg_send![showallitem, autorelease];
 
         // "Quit atomCAD [⌘Q]"
-        let s = format!("Quit {}", app_name);
-        let quitmsg: *mut Object = msg_send![class![NSString], alloc];
-        let quitmsg: *mut Object = msg_send![quitmsg,
-                                             initWithBytes: s.as_ptr()
-                                             length: s.len()
-                                             encoding: 4]; // UTF-8
-        let quitmsg: *mut Object = msg_send![quitmsg, autorelease];
-
-        let s = "q"; // ⌘-q shortcut
-        let quitkey: *mut Object = msg_send![class![NSString], alloc];
-        let quitkey: *mut Object = msg_send![quitkey,
-                                             initWithBytes: s.as_ptr()
-                                             length: s.len()
-                                             encoding: 4]; // UTF-8
-        let quitkey: *mut Object = msg_send![quitkey, autorelease];
+        let quitmsg = nsstring(&format!("Quit {}", app_name));
+        let quitkey = nsstring("q");
 
         let quititem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let quititem: *mut Object = msg_send![quititem,
