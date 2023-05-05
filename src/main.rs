@@ -195,7 +195,42 @@ fn main() {
             ..default()
         }))
         .add_startup_system(replace_menu_bar)
+        .add_startup_system(setup)
         .run();
+}
+
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // camera
+    commands.spawn(Camera3dBundle {
+        transform: Transform::from_xyz(0.0, 1.5, 6.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..default()
+    });
+    // torus
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Torus {
+            radius: 1.0,
+            subdivisions_segments: 4,
+            subdivisions_sides: 16,
+            ..default()
+        })),
+        material: materials.add(Color::rgb(0.2, 0.8, 0.4).into()),
+        transform: Transform::from_xyz(0.0, 0.0, 0.0),
+        ..default()
+    });
+    // light source
+    commands.spawn(PointLightBundle {
+        point_light: PointLight {
+            intensity: 10000.0,
+            shadows_enabled: false,
+            ..default()
+        },
+        transform: Transform::from_xyz(-4.0, 8.0, 4.0),
+        ..default()
+    });
 }
 
 // End of File
