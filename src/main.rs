@@ -2,6 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use bevy::{
+    prelude::*,
+    window::{PresentMode, WindowPlugin},
+    winit::{WinitSettings, WinitWindows},
+};
+
 use atomcad::platform::relaunch;
 
 #[cfg(target_os = "macos")]
@@ -12,11 +18,7 @@ use objc::rc::autoreleasepool;
 #[cfg(target_os = "macos")]
 use objc::runtime::Object;
 
-use winit::{
-    event::{Event, StartCause, WindowEvent},
-    event_loop::{ControlFlow, EventLoopBuilder},
-    window::WindowBuilder,
-};
+const APP_NAME: &str = "atomCAD";
 
 fn nsstring(s: &str) -> *mut Object {
     unsafe {
@@ -31,7 +33,13 @@ fn nsstring(s: &str) -> *mut Object {
     }
 }
 
-fn replace_menu_bar(app_name: &str) {
+fn replace_menu_bar(
+    // We have to use `NonSend` here.  This forces this function to be called
+    // from the winit thread (which is the main thread on macOS), after the
+    // window has been created.  We don't actually use it, but this does
+    // control when and from where we will be called.
+    _windows: NonSend<WinitWindows>,
+) {
     // Create the menu on macOS using Cocoa APIs.
     #[cfg(target_os = "macos")]
     autoreleasepool(|| unsafe {
@@ -42,7 +50,7 @@ fn replace_menu_bar(app_name: &str) {
         let empty = nsstring("");
 
         // Create the application menu bar.
-        let appname = nsstring(app_name);
+        let appname = nsstring(APP_NAME);
 
         let mainmenu: *mut Object = msg_send![class![NSMenu], alloc];
         let mainmenu: *mut Object = msg_send![mainmenu, initWithTitle: appname];
@@ -56,7 +64,7 @@ fn replace_menu_bar(app_name: &str) {
         let _: () = msg_send![app, setMainMenu: mainmenu];
 
         // "About atomCAD"
-        let aboutmsg = nsstring(&format!("About {}", app_name));
+        let aboutmsg = nsstring(&format!("About {}", APP_NAME));
 
         let aboutitem: *mut Object = msg_send![class![NSMenuItem], alloc];
         let aboutitem: *mut Object = msg_send![aboutitem,
@@ -93,7 +101,7 @@ fn replace_menu_bar(app_name: &str) {
         let _: () = msg_send![servicesitem, setSubmenu: servicesmenu];
 
         // "Hide atomCAD [⌘H]"
-        let hidemsg = nsstring(&format!("Hide {}", app_name));
+        let hidemsg = nsstring(&format!("Hide {}", APP_NAME));
         let hidekey = nsstring("h");
 
         let hideitem: *mut Object = msg_send![class![NSMenuItem], alloc];
@@ -126,7 +134,7 @@ fn replace_menu_bar(app_name: &str) {
         let showallitem: *mut Object = msg_send![showallitem, autorelease];
 
         // "Quit atomCAD [⌘Q]"
-        let quitmsg = nsstring(&format!("Quit {}", app_name));
+        let quitmsg = nsstring(&format!("Quit {}", APP_NAME));
         let quitkey = nsstring("q");
 
         let quititem: *mut Object = msg_send![class![NSMenuItem], alloc];
@@ -162,8 +170,6 @@ fn replace_menu_bar(app_name: &str) {
 }
 
 fn main() {
-    const APP_NAME: &str = "atomCAD";
-
     // If we are running from the command line (e.g. as a result of `cargo
     // run`), relaunch as a dynamically created app bundle.  This currently
     // only has any effect on macOS, where it is required because many Cocoa
@@ -177,61 +183,18 @@ fn main() {
         Ok(app) => app,
     };
 
-    // Create the event loop.
-    let mut event_loop = EventLoopBuilder::new();
-    let event_loop = event_loop.build();
-
-    // Create the main window.
-    let mut window = match WindowBuilder::new().with_title(APP_NAME).build(&event_loop) {
-        Err(e) => {
-            println!("Failed to create window: {}", e);
-            std::process::exit(1);
-        }
-        Ok(window) => Some(window),
-    };
-
-    // Run the event loop.
-    event_loop.run(move |event, _, control_flow| {
-        // When we are done handling this event, suspend until the next event.
-        *control_flow = ControlFlow::Wait;
-
-        // Handle events.
-        match event {
-            Event::NewEvents(StartCause::Init) => {
-                // Will be called once when the event loop starts.
-                replace_menu_bar(APP_NAME);
-            }
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
-                // The user has requested to close the window.
-                // Drop the window to fire the `Destroyed` event.
-                window = None;
-            }
-            Event::WindowEvent {
-                event: WindowEvent::Destroyed,
-                ..
-            } => {
-                // The window has been destroyed, time to exit stage left.
-                *control_flow = ControlFlow::ExitWithCode(0);
-            }
-            Event::MainEventsCleared => {
-                // The event queue is empty, so we can safely redraw the window.
-                if let Some(w) = &window {
-                    w.request_redraw();
-                }
-            }
-            Event::LoopDestroyed => {
-                // The event loop has been destroyed, so we can safely terminate
-                // the application.  This is the very last event we will ever
-                // receive, so we can safely perform final rites.
-            }
-            _ => {
-                // Unknown event; do nothing.
-            }
-        }
-    });
+    App::new()
+        .insert_resource(WinitSettings::desktop_app())
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                // Turn off vsync to maximize CPU/GPU usage
+                present_mode: PresentMode::AutoNoVsync,
+                ..default()
+            }),
+            ..default()
+        }))
+        .add_startup_system(replace_menu_bar)
+        .run();
 }
 
 // End of File
