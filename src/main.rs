@@ -21,6 +21,7 @@ use objc::runtime::Object;
 
 const APP_NAME: &str = "atomCAD";
 
+#[cfg(target_os = "macos")]
 fn nsstring(s: &str) -> *mut Object {
     unsafe {
         let cls = class!(NSString);
