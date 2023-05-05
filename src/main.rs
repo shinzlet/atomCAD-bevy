@@ -7,6 +7,7 @@ use bevy::{
     window::{PresentMode, WindowPlugin},
     winit::{WinitSettings, WinitWindows},
 };
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
 use atomcad::platform::relaunch;
 
@@ -194,8 +195,10 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugin(EguiPlugin)
         .add_startup_system(replace_menu_bar)
         .add_startup_system(setup)
+        .add_system(ui_hello_world)
         .run();
 }
 
@@ -230,6 +233,12 @@ fn setup(
         },
         transform: Transform::from_xyz(-4.0, 8.0, 4.0),
         ..default()
+    });
+}
+
+fn ui_hello_world(mut contexts: EguiContexts) {
+    egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
+        ui.label("Hello World!");
     });
 }
 
