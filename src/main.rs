@@ -187,6 +187,7 @@ fn main() {
         .insert_resource(WinitSettings::desktop_app())
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
+                title: APP_NAME.into(),
                 // Turn off vsync to maximize CPU/GPU usage
                 present_mode: PresentMode::AutoNoVsync,
                 ..default()
