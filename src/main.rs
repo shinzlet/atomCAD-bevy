@@ -35,6 +35,219 @@ fn nsstring(s: &str) -> *mut Object {
     }
 }
 
+// A menubar is a hierarchical list of actions with attached titles and/or
+// keyboard shortcuts.  It is attached to either the application instance
+// (macOS) or the main window (Windows/Linux).
+//
+// Menus can also be contextual (e.g. a popup right-click menu) or accessed
+// from the system tray.
+struct Menu {
+    title: String,
+    items: Vec<MenuItem>,
+}
+
+impl Menu {
+    fn new(title: &str) -> Self {
+        Self {
+            title: title.to_owned(),
+            items: Vec::new(),
+        }
+    }
+
+    fn add(mut self, item: MenuItem) -> Self {
+        self.items.push(item);
+        self
+    }
+}
+
+// A menu item is either an action (with an optional keyboard shortcut) or a
+// submenu.  The Separator is a visual divider between groups of related menu
+// items.
+enum MenuItem {
+    Separator,
+    Entry(String, MenuShortcut, MenuAction),
+    SubMenu(Menu),
+}
+
+impl MenuItem {
+    fn new(title: &str, shortcut: MenuShortcut, action: MenuAction) -> Self {
+        Self::Entry(title.to_owned(), shortcut, action)
+    }
+}
+
+// A keyboard shortcut is a combination of modifier keys (e.g. Shift, Option,
+// Alt, etc.) and the key to press (indicated by a unicode character).
+#[derive(Clone, Copy)]
+enum MenuShortcut {
+    None,
+    System(SystemShortcut),
+}
+
+// Common actions like copy-paste, file-open, and quit are usually bound to
+// shortcuts that vary from platform to platform, but are expected to remain
+// consistent across all apps on that platform.
+#[derive(Clone, Copy)]
+enum SystemShortcut {
+    Preferences,
+    HideApp,
+    HideOthers,
+    QuitApp,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+struct ModifierKeys(u8);
+
+impl ModifierKeys {
+    const NONE: ModifierKeys = ModifierKeys(0);
+    const CAPSLOCK: ModifierKeys = ModifierKeys(1 << 0);
+    const SHIFT: ModifierKeys = ModifierKeys(1 << 1);
+    const CONTROL: ModifierKeys = ModifierKeys(1 << 2);
+    const OPTION: ModifierKeys = ModifierKeys(1 << 3);
+    const COMMAND: ModifierKeys = ModifierKeys(1 << 4);
+    const NUMPAD: ModifierKeys = ModifierKeys(1 << 5);
+    const HELP: ModifierKeys = ModifierKeys(1 << 6);
+    const FUNCTION: ModifierKeys = ModifierKeys(1 << 7);
+
+    fn contains(self, other: ModifierKeys) -> bool {
+        (self.0 & other.0) == other.0
+    }
+}
+
+impl std::ops::BitOr for ModifierKeys {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        ModifierKeys(self.0 | rhs.0)
+    }
+}
+
+// A menu action is a callback that is invoked when the menu item is selected.
+// There are also a number of important platform-specific actions that can be
+// invoked.
+enum MenuAction {
+    System(SystemAction),
+}
+
+enum SystemAction {
+    LaunchAboutWindow,
+    LaunchPreferences,
+    ServicesMenu,
+    HideApp,
+    HideOthers,
+    ShowAll,
+    Terminate,
+}
+
+unsafe fn build_menu(app: *mut Object, services_menu: *mut Object, menu: &Menu) -> *mut Object {
+    // Create root menu bar.
+    let menuobj: *mut Object = msg_send![class![NSMenu], alloc];
+    let menuobj: *mut Object = msg_send![menuobj, initWithTitle: nsstring(&menu.title)];
+    let menuobj: *mut Object = msg_send![menuobj, autorelease];
+
+    for menuitem in menu.items.iter() {
+        match menuitem {
+            MenuItem::Separator => {
+                let item: *mut Object = msg_send![class![NSMenuItem], separatorItem];
+                let _: () = msg_send![menuobj, addItem: item];
+            }
+            MenuItem::Entry(title, shortcut, action) => {
+                let title = nsstring(&title);
+                let mut is_service_menu = false;
+                let action = match action {
+                    MenuAction::System(action) => match action {
+                        SystemAction::LaunchAboutWindow => {
+                            Some(sel!(orderFrontStandardAboutPanel:))
+                        }
+                        SystemAction::LaunchPreferences => Some(sel!(orderFrontPreferencesPanel:)),
+                        SystemAction::ServicesMenu => {
+                            is_service_menu = true;
+                            None
+                        }
+                        SystemAction::HideApp => Some(sel!(hide:)),
+                        SystemAction::HideOthers => Some(sel!(hideOtherApplications:)),
+                        SystemAction::ShowAll => Some(sel!(unhideAllApplications:)),
+                        SystemAction::Terminate => Some(sel!(terminate:)),
+                    },
+                };
+                let shortcutkey = match shortcut {
+                    MenuShortcut::None => nsstring(""),
+                    MenuShortcut::System(shortcut) => match shortcut {
+                        SystemShortcut::Preferences => nsstring(","),
+                        SystemShortcut::HideApp => nsstring("h"),
+                        SystemShortcut::HideOthers => nsstring("h"),
+                        SystemShortcut::QuitApp => nsstring("q"),
+                    },
+                };
+                let shotcutmodifiers = match shortcut {
+                    MenuShortcut::None => ModifierKeys::NONE,
+                    MenuShortcut::System(shortcut) => match shortcut {
+                        SystemShortcut::Preferences => ModifierKeys::COMMAND,
+                        SystemShortcut::HideApp => ModifierKeys::COMMAND,
+                        SystemShortcut::HideOthers => ModifierKeys::COMMAND | ModifierKeys::OPTION,
+                        SystemShortcut::QuitApp => ModifierKeys::COMMAND,
+                    },
+                };
+                let mut item: *mut Object = msg_send![class![NSMenuItem], alloc];
+                if let Some(action) = action {
+                    item = msg_send![item,
+                                     initWithTitle: title
+                                     action: action
+                                     keyEquivalent: shortcutkey];
+                } else {
+                    item = msg_send![item,
+                                     initWithTitle: title
+                                     action: 0
+                                     keyEquivalent: shortcutkey];
+                }
+                if shotcutmodifiers != ModifierKeys::NONE {
+                    let mut modifiermask = 0usize;
+                    if shotcutmodifiers.contains(ModifierKeys::CAPSLOCK) {
+                        modifiermask |= 1 << 16; // NSEventModifierFlagCapsLock
+                    }
+                    if shotcutmodifiers.contains(ModifierKeys::SHIFT) {
+                        modifiermask |= 1 << 17; // NSEventModifierFlagShift
+                    }
+                    if shotcutmodifiers.contains(ModifierKeys::CONTROL) {
+                        modifiermask |= 1 << 18; // NSEventModifierFlagControl
+                    }
+                    if shotcutmodifiers.contains(ModifierKeys::OPTION) {
+                        modifiermask |= 1 << 19; // NSEventModifierFlagOption
+                    }
+                    if shotcutmodifiers.contains(ModifierKeys::COMMAND) {
+                        modifiermask |= 1 << 20; // NSEventModifierFlagCommand
+                    }
+                    if shotcutmodifiers.contains(ModifierKeys::NUMPAD) {
+                        modifiermask |= 1 << 21; // NSEventModifierFlagNumericPad
+                    }
+                    if shotcutmodifiers.contains(ModifierKeys::HELP) {
+                        modifiermask |= 1 << 22; // NSEventModifierFlagHelp
+                    }
+                    if shotcutmodifiers.contains(ModifierKeys::FUNCTION) {
+                        modifiermask |= 1 << 23; // NSEventModifierFlagFunction
+                    }
+                    let _: () = msg_send![item, setKeyEquivalentModifierMask: modifiermask];
+                }
+                item = msg_send![item, autorelease];
+                if is_service_menu {
+                    let _: () = msg_send![item, setSubmenu: services_menu];
+                }
+                let _: () = msg_send![menuobj, addItem: item];
+            }
+            MenuItem::SubMenu(submenu) => {
+                let item: *mut Object = msg_send![class![NSMenuItem], alloc];
+                let item: *mut Object = msg_send![item, init];
+                let item: *mut Object = msg_send![item, autorelease];
+                let submenu = build_menu(app, services_menu, &submenu);
+                let _: () = msg_send![item, setSubmenu: submenu];
+                let _: () = msg_send![menuobj, addItem: item];
+            }
+        }
+    }
+
+    // Return the menu object to the caller.
+    menuobj
+}
+
 fn replace_menu_bar(
     // We have to use `NonSend` here.  This forces this function to be called
     // from the winit thread (which is the main thread on macOS), after the
@@ -42,132 +255,66 @@ fn replace_menu_bar(
     // control when and from where we will be called.
     _windows: NonSend<WinitWindows>,
 ) {
+    let menubar = Menu::new(APP_NAME).add(MenuItem::SubMenu(
+        Menu::new("")
+            .add(MenuItem::new(
+                &format!("About {}", APP_NAME),
+                MenuShortcut::None,
+                MenuAction::System(SystemAction::LaunchAboutWindow),
+            ))
+            .add(MenuItem::Separator)
+            .add(MenuItem::new(
+                "Settings...",
+                MenuShortcut::System(SystemShortcut::Preferences),
+                MenuAction::System(SystemAction::LaunchPreferences),
+            ))
+            .add(MenuItem::Separator)
+            .add(MenuItem::new(
+                "Services",
+                MenuShortcut::None,
+                MenuAction::System(SystemAction::ServicesMenu),
+            ))
+            .add(MenuItem::Separator)
+            .add(MenuItem::new(
+                &format!("Hide {}", APP_NAME),
+                MenuShortcut::System(SystemShortcut::HideApp),
+                MenuAction::System(SystemAction::HideApp),
+            ))
+            .add(MenuItem::new(
+                "Hide Others",
+                MenuShortcut::System(SystemShortcut::HideOthers),
+                MenuAction::System(SystemAction::HideOthers),
+            ))
+            .add(MenuItem::new(
+                "Show All",
+                MenuShortcut::None,
+                MenuAction::System(SystemAction::ShowAll),
+            ))
+            .add(MenuItem::Separator)
+            .add(MenuItem::new(
+                &format!("Quit {}", APP_NAME),
+                MenuShortcut::System(SystemShortcut::QuitApp),
+                MenuAction::System(SystemAction::Terminate),
+            )),
+    ));
+
     // Create the menu on macOS using Cocoa APIs.
     #[cfg(target_os = "macos")]
     autoreleasepool(|| unsafe {
         // Get the application object.
         let app: *mut Object = msg_send![class![NSApplication], sharedApplication];
 
-        // Empty string (for various uses).
-        let empty = nsstring("");
+        // Create and register the services menu.
+        let services_menu: *mut Object = msg_send![class![NSMenu], alloc];
+        let services_menu: *mut Object = msg_send![services_menu, init];
+        let services_menu: *mut Object = msg_send![services_menu, autorelease];
+        let _: () = msg_send![app, setServicesMenu: services_menu];
 
-        // Create the application menu bar.
-        let appname = nsstring(APP_NAME);
+        // Turn the menubar description into a Cocoa menu.
+        let menu = build_menu(app, services_menu, &menubar);
 
-        let mainmenu: *mut Object = msg_send![class![NSMenu], alloc];
-        let mainmenu: *mut Object = msg_send![mainmenu, initWithTitle: appname];
-        let mainmenu: *mut Object = msg_send![mainmenu, autorelease];
-
-        let appmenuitem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let appmenuitem: *mut Object = msg_send![appmenuitem, init];
-        let appmenuitem: *mut Object = msg_send![appmenuitem, autorelease];
-
-        let _: () = msg_send![mainmenu, addItem: appmenuitem];
-        let _: () = msg_send![app, setMainMenu: mainmenu];
-
-        // "About atomCAD"
-        let aboutmsg = nsstring(&format!("About {}", APP_NAME));
-
-        let aboutitem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let aboutitem: *mut Object = msg_send![aboutitem,
-                                               initWithTitle: aboutmsg
-                                               action: sel!(orderFrontStandardAboutPanel:)
-                                               keyEquivalent: empty];
-        let aboutitem: *mut Object = msg_send![aboutitem, autorelease];
-
-        // "Settings... [⌘,]"
-        let settingsmsg = nsstring("Settings...");
-        let settingskey = nsstring(",");
-
-        let settingsitem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let settingsitem: *mut Object = msg_send![settingsitem,
-                                                  initWithTitle: settingsmsg
-                                                  action: 0
-                                                  keyEquivalent: settingskey];
-        let settingsitem: *mut Object = msg_send![settingsitem, autorelease];
-
-        // "Serives" menu
-        let servicesmenu: *mut Object = msg_send![class![NSMenu], alloc];
-        let servicesmenu: *mut Object = msg_send![servicesmenu, init];
-        let servicesmenu: *mut Object = msg_send![servicesmenu, autorelease];
-        let _: () = msg_send![app, setServicesMenu: servicesmenu];
-
-        let servicesmsg = nsstring("Services");
-
-        let servicesitem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let servicesitem: *mut Object = msg_send![servicesitem,
-                                                  initWithTitle: servicesmsg
-                                                  action: 0
-                                                  keyEquivalent: empty];
-        let servicesitem: *mut Object = msg_send![servicesitem, autorelease];
-        let _: () = msg_send![servicesitem, setSubmenu: servicesmenu];
-
-        // "Hide atomCAD [⌘H]"
-        let hidemsg = nsstring(&format!("Hide {}", APP_NAME));
-        let hidekey = nsstring("h");
-
-        let hideitem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let hideitem: *mut Object = msg_send![hideitem,
-                                              initWithTitle: hidemsg
-                                              action: sel!(hide:)
-                                              keyEquivalent: hidekey];
-        let hideitem: *mut Object = msg_send![hideitem, autorelease];
-
-        // "Hide Others [⌥⌘H]"
-        let hideothersmsg = nsstring("Hide Others");
-        let hideotherskey = nsstring("h");
-
-        let hideothersitem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let hideothersitem: *mut Object = msg_send![hideothersitem,
-                                                    initWithTitle: hideothersmsg
-                                                    action: sel!(hideOtherApplications:)
-                                                    keyEquivalent: hideotherskey];
-        let _: () = msg_send![hideothersitem, setKeyEquivalentModifierMask: 0x180000]; // ⌥⌘
-        let hideothersitem: *mut Object = msg_send![hideothersitem, autorelease];
-
-        // "Show All"
-        let showallmsg = nsstring("Show All");
-
-        let showallitem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let showallitem: *mut Object = msg_send![showallitem,
-                                                 initWithTitle: showallmsg
-                                                 action: sel!(unhideAllApplications:)
-                                                 keyEquivalent: empty];
-        let showallitem: *mut Object = msg_send![showallitem, autorelease];
-
-        // "Quit atomCAD [⌘Q]"
-        let quitmsg = nsstring(&format!("Quit {}", APP_NAME));
-        let quitkey = nsstring("q");
-
-        let quititem: *mut Object = msg_send![class![NSMenuItem], alloc];
-        let quititem: *mut Object = msg_send![quititem,
-                                              initWithTitle: quitmsg
-                                              action: sel!(terminate:)
-                                              keyEquivalent: quitkey];
-        let quititem: *mut Object = msg_send![quititem, autorelease];
-
-        // Create the “atomCAD” application menu.
-        let atomcadmenu: *mut Object = msg_send![class![NSMenu], alloc];
-        let atomcadmenu: *mut Object = msg_send![atomcadmenu, init];
-        let atomcadmenu: *mut Object = msg_send![atomcadmenu, autorelease];
-
-        // Add “atomCAD” application menu.
-        let _: () = msg_send![atomcadmenu, addItem: aboutitem];
-        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
-        let _: () = msg_send![atomcadmenu, addItem: sep];
-        let _: () = msg_send![atomcadmenu, addItem: settingsitem];
-        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
-        let _: () = msg_send![atomcadmenu, addItem: sep];
-        let _: () = msg_send![atomcadmenu, addItem: servicesitem];
-        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
-        let _: () = msg_send![atomcadmenu, addItem: sep];
-        let _: () = msg_send![atomcadmenu, addItem: hideitem];
-        let _: () = msg_send![atomcadmenu, addItem: hideothersitem];
-        let _: () = msg_send![atomcadmenu, addItem: showallitem];
-        let sep: *mut Object = msg_send![class![NSMenuItem], separatorItem];
-        let _: () = msg_send![atomcadmenu, addItem: sep];
-        let _: () = msg_send![atomcadmenu, addItem: quititem];
-        let _: () = msg_send![appmenuitem, setSubmenu: atomcadmenu];
+        // Register the menu with the NSApplication object.
+        let _: () = msg_send![app, setMainMenu: menu];
     });
 }
 
