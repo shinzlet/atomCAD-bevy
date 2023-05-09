@@ -248,12 +248,42 @@ unsafe fn build_menu(app: *mut Object, services_menu: *mut Object, menu: &Menu) 
     menuobj
 }
 
+#[cfg(target_os = "macos")]
+fn attach_menu(
+    // On some platforms, e.g. Windows and Linux, the menu bar is part of the
+    // window itself, and we need to add it to each individual window.  But
+    // for macOS the menu bar is a property of the NSApplication instance
+    // shared by the entire process, so we only need to set it once and don't
+    // use the `WinitWindows` parameter.
+    _windows: &WinitWindows,
+    menu: &Menu,
+) {
+    // Create the menu on macOS using Cocoa APIs.
+    #[cfg(target_os = "macos")]
+    autoreleasepool(|| unsafe {
+        // Get the application object.
+        let app: *mut Object = msg_send![class![NSApplication], sharedApplication];
+
+        // Create and register the services menu.
+        let services_menu: *mut Object = msg_send![class![NSMenu], alloc];
+        let services_menu: *mut Object = msg_send![services_menu, init];
+        let services_menu: *mut Object = msg_send![services_menu, autorelease];
+        let _: () = msg_send![app, setServicesMenu: services_menu];
+
+        // Turn the menubar description into a Cocoa menu.
+        let obj = build_menu(app, services_menu, &menu);
+
+        // Register the menu with the NSApplication object.
+        let _: () = msg_send![app, setMainMenu: obj];
+    });
+}
+
 fn replace_menu_bar(
     // We have to use `NonSend` here.  This forces this function to be called
     // from the winit thread (which is the main thread on macOS), after the
-    // window has been created.  We don't actually use it, but this does
-    // control when and from where we will be called.
-    _windows: NonSend<WinitWindows>,
+    // window has been created.  We don't actually use it on macOS, but this
+    // does control when and from where we will be called.
+    windows: NonSend<WinitWindows>,
 ) {
     let menubar = Menu::new(APP_NAME).add(MenuItem::SubMenu(
         Menu::new("")
@@ -298,24 +328,9 @@ fn replace_menu_bar(
             )),
     ));
 
-    // Create the menu on macOS using Cocoa APIs.
-    #[cfg(target_os = "macos")]
-    autoreleasepool(|| unsafe {
-        // Get the application object.
-        let app: *mut Object = msg_send![class![NSApplication], sharedApplication];
-
-        // Create and register the services menu.
-        let services_menu: *mut Object = msg_send![class![NSMenu], alloc];
-        let services_menu: *mut Object = msg_send![services_menu, init];
-        let services_menu: *mut Object = msg_send![services_menu, autorelease];
-        let _: () = msg_send![app, setServicesMenu: services_menu];
-
-        // Turn the menubar description into a Cocoa menu.
-        let menu = build_menu(app, services_menu, &menubar);
-
-        // Register the menu with the NSApplication object.
-        let _: () = msg_send![app, setMainMenu: menu];
-    });
+    // Do the platform-dependent work of constructing the menubar and
+    // attaching it to the application object or main window.
+    attach_menu(&(*windows), &menubar);
 }
 
 fn main() {
