@@ -8,6 +8,7 @@ use bevy::{
     winit::WinitSettings,
 };
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
 
 use atomcad::menubar::winit_menu_bar;
 use atomcad::platform::relaunch;
@@ -39,6 +40,7 @@ fn main() {
             ..default()
         }))
         .add_plugin(EguiPlugin)
+        .add_plugin(InfiniteGridPlugin)
         .add_startup_system(winit_menu_bar)
         .add_startup_system(setup)
         .add_system(ui_hello_world)
@@ -54,6 +56,14 @@ fn setup(
     commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(0.0, 1.5, 6.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
+    });
+    // infinite grid
+    commands.spawn(InfiniteGridBundle {
+        grid: InfiniteGrid {
+            ..Default::default()
+        },
+        transform: Transform::from_xyz(0.0, -1.0, 0.0),
+        ..Default::default()
     });
     // torus
     commands.spawn(PbrBundle {

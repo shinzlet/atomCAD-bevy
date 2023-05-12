@@ -18,6 +18,7 @@ opt-level = 3
 [dependencies]
 bevy = "0.10.1"
 bevy_egui = "0.20.3"
+bevy_infinite_grid = "0.7.0"
 objc = "0.2.7"
 relaunch = "0.1.2"
 winit = "0.28.2"
