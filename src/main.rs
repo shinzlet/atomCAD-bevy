@@ -11,23 +11,9 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
 
 use atomcad::menubar::winit_menu_bar;
-use atomcad::platform::relaunch;
 use atomcad::APP_NAME;
 
 fn main() {
-    // If we are running from the command line (e.g. as a result of `cargo
-    // run`), relaunch as a dynamically created app bundle.  This currently
-    // only has any effect on macOS, where it is required because many Cocoa
-    // APIs will not work unless the application is running from a bundle.
-    match relaunch::Trampoline::new(&APP_NAME, "io.atomcad.atomCAD", env!("CARGO_PKG_VERSION")) {
-        Err(e) => {
-            // We can't read/write to the filesystem?  This is a fatal error.
-            println!("IO error! {}", e);
-            std::process::exit(1);
-        }
-        Ok(app) => app,
-    };
-
     App::new()
         .insert_resource(WinitSettings::desktop_app())
         .add_plugins(DefaultPlugins.set(WindowPlugin {

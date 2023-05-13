@@ -3,6 +3,5 @@
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use crate::platform_impl::menubar;
-pub use crate::platform_impl::relaunch;
 
 // End of File
