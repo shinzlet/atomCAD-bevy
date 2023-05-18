@@ -7,6 +7,7 @@ use bevy::{
     prelude::*,
     window::PrimaryWindow,
 };
+use bevy_egui::EguiContexts;
 
 // Copied from the Unofficial Bevy Cheat Book
 // https://bevy-cheatbook.github.io/cookbook/pan-orbit-camera.html
@@ -30,6 +31,7 @@ impl Default for PanOrbitCamera {
 
 pub fn pan_orbit_camera(
     window: Query<&Window, With<PrimaryWindow>>,
+    mut egui_contexts: EguiContexts,
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
@@ -39,6 +41,11 @@ pub fn pan_orbit_camera(
         return;
     };
     let window_size = Vec2::new(window.width() as f32, window.height() as f32);
+
+    if egui_contexts.ctx_mut().is_pointer_over_area() {
+        // don't move the camera if the mouse is over an egui element
+        return;
+    }
 
     // TODO: Fetch these from user settings.
     let orbit_button = MouseButton::Left;
