@@ -7,6 +7,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = [
+    "crates/periodic-table",
+]
+
+[dependencies.periodic-table]
+package = "atomcad-periodic-table"
+path = "crates/periodic-table"
+
 # Enable a small amount of optimization in debug mode
 [profile.dev]
 opt-level = 1
