@@ -9,9 +9,10 @@ A CAD environment for designing atomically-precise molecular nanotechnology.
 3. `git clone` this repository and navigate to it
 4. run `cargo run`
 
-## Web
+needed to install libiconv
 
-1. Install wasm32 target: `rustup target add wasm32-unknown-unknown`
-2. Install trunk: `cargo install --locked trunk`
-3. `git clone` this repository and navigate to it
-4. run `trunk serve --open`
+## Needed to build dependencies w/ Nix on MacOS:
+`export CFLAGS="-I/System/Volumes/Data/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -Wno-undef-prefix"`
+`export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"` 
+
+There is an unresolved nix issue where the nix clang does not properly have some headers included, you must use apple clang via `PATH="/usr/bin:$PATH" cargo build` (yes, this defeats the purpose of nix in a large way, but it works for now)

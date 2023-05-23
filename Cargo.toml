@@ -25,6 +25,8 @@ eframe = { version = "0.21.3", default-features = false, features = [
     "wgpu",          # Use wgpu for rendering.
 ]}
 winit = "0.28.2"
+# debug feature is on by default, which renders unwanted picking info
+bevy_mod_picking = { version = "0.13.0", default-features = true, features = [] }
 
 # macOS
 [target.'cfg(target_os = "macos")'.dependencies]
