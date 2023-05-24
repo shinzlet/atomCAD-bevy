@@ -12,15 +12,50 @@ use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 type Element = u32;
 type BondOrder = u32;
-type Molecule = petgraph::graph::UnGraph<Atom, BondOrder>;
+type Molecule = petgraph::graph::UnGraph<Vertex, BondOrder>;
 
-#[derive(Default, Component)]
+#[derive(Component, Debug)]
 pub struct Atom {
     pos: Vec3,
     element: u32,
-    entity: Option<Entity>
+    entity: Entity
 }
 
+impl Into<Vertex> for Atom {
+    fn into(self) -> Vertex {
+        Vertex::Atom(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct LonePair {
+    pos: Vec3
+}
+
+impl Into<Vertex> for LonePair {
+    fn into(self) -> Vertex {
+        Vertex::LonePair(self)
+    }
+}
+
+#[derive(Debug)]
+pub enum Vertex {
+    Atom(Atom),
+    LonePair(LonePair)
+}
+
+//impl Vertex {
+    //fn new(atom: Atom) {
+        //Vertex::Atom(atom)
+    //}
+
+    //fn new(lone_pair: LonePair) {
+        //Vertex::LonePair(lone_pair)
+    //}
+//}
+
+// Must have only one bond in the graph, which connects it to
+// the target atom
 #[derive(Default, Component)]
 pub struct BindingSite {
     pos: Vec3,
@@ -48,8 +83,7 @@ pub fn molecule_builder(
     mut workspace: ResMut<Workspace>
 ) {
     for (mut entity, mut site, transform) in query.iter_mut() {
-        workspace.molecules[0].add_node(Atom::default());
-        println!("gen {} idx {}", entity.generation(), entity.index());
+        // workspace.molecules[0].add_node(Atom::default());
         // Destroy the binding site
         commands.entity(entity).despawn();
 
@@ -102,24 +136,43 @@ pub fn init_molecule(
     };
 
     // Create an initial carbon atom
-    commands.spawn(atompbr.carbon.clone());
+    let carbon_pbr = atompbr.carbon.clone();
+    let initial_carbon_pos = carbon_pbr.transform.translation;
+    let initial_carbon = commands.spawn(carbon_pbr).id();
 
     // Create a lone pair
-    let mut lone_pair = atompbr.lone_pair.clone();
-    lone_pair.transform = Transform::from_xyz(1.5, 0.0, 0.0);
-    commands.spawn((
-        lone_pair,
+    let mut initial_lone_pair_pbr = atompbr.lone_pair.clone();
+    let initial_lone_pair_pos = Vec3::new(1.5, 0.0, 0.0);
+    initial_lone_pair_pbr.transform.translation = initial_lone_pair_pos;
+    let initial_lone_pair = commands.spawn((
+        initial_lone_pair_pbr,
         RaycastPickTarget::default(),   // Marker for the `bevy_picking_raycast` backend
         OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
             target_commands.insert(ClickFlag::default());
         }),
         BindingSite::default()
-    ));
+    )).id();
 
     commands.insert_resource(atompbr);
 
     let mut workspace = Workspace::default();
-    workspace.molecules.push(Molecule::default());
+    let mut initial_molecule = Molecule::default();
+
+    let initial_carbon = Atom {
+        entity: initial_carbon,
+        pos: initial_carbon_pos,
+        element: 6
+    };
+
+    let initial_lone_pair = LonePair {
+        pos: initial_lone_pair_pos
+    };
+
+    let i1 = initial_molecule.add_node(initial_carbon.into());
+    let i2 = initial_molecule.add_node(initial_lone_pair.into());
+    initial_molecule.add_edge(i1, i2, 1);
+    println!("{:?}", initial_molecule);
+    workspace.molecules.push(initial_molecule);
 
     commands.insert_resource(workspace);
 }
