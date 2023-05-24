@@ -12,7 +12,7 @@ use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_mod_picking::prelude::*;
 
 use atomcad::camera::{pan_orbit_camera, PanOrbitCamera};
-use atomcad::molecule_builder::{molecule_builder, init_molecule, Molecule, ClickFlag, Atom, BindingSite};
+use atomcad::molecule_builder::{molecule_builder, init_molecule, ClickFlag, Atom, BindingSite};
 use atomcad::menubar::winit_menu_bar;
 use atomcad::APP_NAME;
 
@@ -78,37 +78,6 @@ fn setup(
         ..default()
     });
 
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::UVSphere {
-                radius: 1.0,
-                sectors: 8,
-                stacks: 8
-            })),
-            material: materials.add(Color::rgb(0.2, 0.2, 0.2).into()),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            ..default()
-        },
-        Molecule::default()
-    ));
-
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::UVSphere {
-                radius: 0.3,
-                sectors: 8,
-                stacks: 8
-            })),
-            material: materials.add(Color::rgb(0.7, 0.7, 0.7).into()),
-            transform: Transform::from_xyz(1.5, 0.0, 0.0),
-            ..default()
-        },
-        RaycastPickTarget::default(),   // Marker for the `bevy_picking_raycast` backend
-        OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
-            target_commands.insert(ClickFlag::default());
-        }),
-        BindingSite::default()
-    ));
 }
 
 fn ui_hello_world(mut contexts: EguiContexts) {
