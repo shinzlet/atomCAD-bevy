@@ -12,7 +12,7 @@ use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_mod_picking::prelude::*;
 
 use atomcad::camera::{pan_orbit_camera, PanOrbitCamera};
-use atomcad::molecule_builder::{molecule_builder, init_molecule, ClickFlag, Atom, BindingSite};
+use atomcad::molecule_builder::{molecule_builder, init_molecule, ClickFlag, Atom};
 use atomcad::menubar::winit_menu_bar;
 use atomcad::APP_NAME;
 
