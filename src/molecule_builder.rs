@@ -16,15 +16,15 @@
 
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
-use petgraph::graph::NodeIndex;
+use petgraph::stable_graph::NodeIndex;
 
 type Element = u32;
 type BondOrder = u32;
-type MolGraph = petgraph::graph::UnGraph<Entity, BondOrder>;
+type MolGraph = petgraph::stable_graph::StableUnGraph<Entity, BondOrder>;
 
 #[derive(Component)]
 pub struct Molecule {
-    graph: MolGraph,
+    graph: MolGraph
 }
 
 #[derive(Component, Debug)]
@@ -54,19 +54,8 @@ pub struct Atom {
 pub struct LonePair {
     // See `Atom` to know why this is commented
     // pos: Vec3
+    graph_index: NodeIndex
 }
-
-//impl Into<Vertex> for LonePair {
-//fn into(self) -> Vertex {
-//Vertex::LonePair(self)
-//}
-//}
-
-//#[derive(Debug)]
-//pub enum Vertex {
-//Atom(Atom),
-//LonePair(LonePair),
-//}
 
 #[derive(Resource)]
 pub struct AtomPbr {
@@ -79,28 +68,17 @@ pub struct ClickFlag {}
 
 pub fn molecule_builder(
     mut commands: Commands,
-    mut query: Query<(Entity, &Parent, &Transform), With<ClickFlag>>,
+    mut query: Query<(Entity, &Parent, &Transform, &LonePair), With<ClickFlag>>,
     mut q_parent: Query<&mut Molecule>,
     atompbr: Res<AtomPbr>,
 ) {
-    for (mut entity, mut parent, transform) in query.iter_mut() {
+    for (mut entity, mut parent, transform, clicked_lone_pair) in query.iter_mut() {
         // Retrieve the parent of the clicked particle - i.e. the
         // molecule graph.
         let molecule: &mut Molecule = q_parent.get_mut(parent.get()).unwrap().into_inner();
         println!("{:?}", molecule.graph);
 
-        // Destroy the binding site:
-        // First, find the node index in the molecule
-        let index = molecule.graph.raw_nodes().iter().position(|n| n.weight == entity);
-        let index = match index {
-            None => {
-                println!("couldn't remove!");
-                // Give up on this click flag
-                commands.entity(entity).remove::<ClickFlag>();
-                return
-            },
-            Some(node_index) => NodeIndex::new(node_index)
-        };
+        let index = clicked_lone_pair.graph_index;
 
         // Get the atom this lone pair was connected to before removing it
         // (recall that we demand that all lone pairs have exactly one
@@ -125,14 +103,16 @@ pub fn molecule_builder(
                 RaycastPickTarget::default(),
                 OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
                     target_commands.insert(ClickFlag::default());
-                }),
-                LonePair {},
+                })
             ))
             .id();
 
         // Store the graph indexes needed
         let new_atom_index = molecule.graph.add_node(new_atom);
         let lone_pair_index = molecule.graph.add_node(lone_pair);
+
+        // Add a LonePair component to the entity so that it can track this
+        commands.entity(lone_pair).insert(LonePair { graph_index: lone_pair_index });
 
         // Add a single bond between the atom and new lone pair
         molecule.graph.add_edge(new_atom_index, lone_pair_index, 1);
@@ -187,8 +167,7 @@ pub fn init_molecule(
             RaycastPickTarget::default(),
             OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
                 target_commands.insert(ClickFlag::default());
-            }),
-            LonePair {},
+            })
         ))
         .id();
 
@@ -200,6 +179,9 @@ pub fn init_molecule(
     // Store the graph indexes needed
     let i1 = molgraph.add_node(initial_carbon);
     let i2 = molgraph.add_node(initial_lone_pair);
+
+    // Add a LonePair component to the entity so that it can track this
+    commands.entity(initial_lone_pair).insert(LonePair { graph_index: i2 });
 
     // Add a single bond between them
     molgraph.add_edge(i1, i2, 1);
