@@ -16,15 +16,16 @@
 
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
+use periodic_table::Element;
 use petgraph::stable_graph::NodeIndex;
+use std::collections::HashMap;
 
-type Element = u32;
 type BondOrder = u32;
 type MolGraph = petgraph::stable_graph::StableUnGraph<Entity, BondOrder>;
 
 #[derive(Component)]
 pub struct Molecule {
-    graph: MolGraph
+    graph: MolGraph,
 }
 
 #[derive(Component, Debug)]
@@ -39,14 +40,8 @@ pub struct Atom {
     // double precision (not single float Vec3) relative to the COM (not
     // relative to the world origin).
     // pos: Vec3,
-    element: u32,
+    element: Element,
 }
-
-//impl Into<Vertex> for Atom {
-//fn into(self) -> Vertex {
-//Vertex::Atom(self)
-//}
-//}
 
 // Must have only one bond in the graph, which connects it to
 // the target atom
@@ -54,13 +49,13 @@ pub struct Atom {
 pub struct LonePair {
     // See `Atom` to know why this is commented
     // pos: Vec3
-    graph_index: NodeIndex
+    graph_index: NodeIndex,
 }
 
 #[derive(Resource)]
-pub struct AtomPbr {
+pub struct PbrCache {
     lone_pair: PbrBundle,
-    carbon: PbrBundle,
+    atoms: HashMap<Element, PbrBundle>,
 }
 
 #[derive(Default, Component)]
@@ -70,7 +65,7 @@ pub fn molecule_builder(
     mut commands: Commands,
     mut query: Query<(Entity, &Parent, &Transform, &LonePair), With<ClickFlag>>,
     mut q_parent: Query<&mut Molecule>,
-    atompbr: Res<AtomPbr>,
+    pbr_cache: Res<PbrCache>,
 ) {
     for (mut entity, mut parent, transform, clicked_lone_pair) in query.iter_mut() {
         // Retrieve the parent of the clicked particle - i.e. the
@@ -89,12 +84,19 @@ pub fn molecule_builder(
         commands.entity(entity).despawn();
 
         // Place a new atom
-        let mut new_atom = atompbr.carbon.clone();
+        let mut new_atom = pbr_cache.atoms[&Element::Carbon].clone();
         new_atom.transform = *transform;
-        let new_atom = commands.spawn((new_atom, Atom { element: 6 })).id();
+        let new_atom = commands
+            .spawn((
+                new_atom,
+                Atom {
+                    element: Element::Carbon,
+                },
+            ))
+            .id();
 
         // Add a new binding site
-        let mut lone_pair = atompbr.lone_pair.clone();
+        let mut lone_pair = pbr_cache.lone_pair.clone();
         lone_pair.transform = *transform;
         lone_pair.transform.translation += Vec3::new(1.5, 0.0, 0.0);
         let lone_pair = commands
@@ -103,7 +105,7 @@ pub fn molecule_builder(
                 RaycastPickTarget::default(),
                 OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
                     target_commands.insert(ClickFlag::default());
-                })
+                }),
             ))
             .id();
 
@@ -112,7 +114,9 @@ pub fn molecule_builder(
         let lone_pair_index = molecule.graph.add_node(lone_pair);
 
         // Add a LonePair component to the entity so that it can track this
-        commands.entity(lone_pair).insert(LonePair { graph_index: lone_pair_index });
+        commands.entity(lone_pair).insert(LonePair {
+            graph_index: lone_pair_index,
+        });
 
         // Add a single bond between the atom and new lone pair
         molecule.graph.add_edge(new_atom_index, lone_pair_index, 1);
@@ -120,7 +124,9 @@ pub fn molecule_builder(
         // Add a single bond between the old atom and this atom:
         molecule.graph.add_edge(new_atom_index, bond_target, 1);
 
-        commands.entity(parent.get()).push_children(&[new_atom, lone_pair]);
+        commands
+            .entity(parent.get())
+            .push_children(&[new_atom, lone_pair]);
     }
 }
 
@@ -129,17 +135,8 @@ pub fn init_molecule(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let atompbr = AtomPbr {
-        carbon: PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::UVSphere {
-                radius: 1.0,
-                sectors: 8,
-                stacks: 8,
-            })),
-            material: materials.add(Color::rgb(0.2, 0.2, 0.2).into()),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            ..default()
-        },
+    let mut pbr_cache = PbrCache {
+        atoms: HashMap::new(),
         lone_pair: PbrBundle {
             mesh: meshes.add(Mesh::from(shape::UVSphere {
                 radius: 0.3,
@@ -152,13 +149,34 @@ pub fn init_molecule(
         },
     };
 
+    pbr_cache.atoms.insert(
+        Element::Carbon,
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::UVSphere {
+                radius: 1.0,
+                sectors: 8,
+                stacks: 8,
+            })),
+            material: materials.add(Color::rgb(0.2, 0.2, 0.2).into()),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            ..default()
+        },
+    );
+
     // Create an initial carbon atom
-    let carbon_pbr = atompbr.carbon.clone();
+    let carbon_pbr = pbr_cache.atoms[&Element::Carbon].clone();
     let initial_carbon_pos = carbon_pbr.transform.translation;
-    let initial_carbon = commands.spawn((carbon_pbr, Atom { element: 6 })).id();
+    let initial_carbon = commands
+        .spawn((
+            carbon_pbr,
+            Atom {
+                element: Element::Carbon,
+            },
+        ))
+        .id();
 
     // Create a lone pair
-    let mut initial_lone_pair_pbr = atompbr.lone_pair.clone();
+    let mut initial_lone_pair_pbr = pbr_cache.lone_pair.clone();
     let initial_lone_pair_pos = Vec3::new(1.5, 0.0, 0.0);
     initial_lone_pair_pbr.transform.translation = initial_lone_pair_pos;
     let initial_lone_pair = commands
@@ -167,11 +185,11 @@ pub fn init_molecule(
             RaycastPickTarget::default(),
             OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
                 target_commands.insert(ClickFlag::default());
-            })
+            }),
         ))
         .id();
 
-    commands.insert_resource(atompbr);
+    commands.insert_resource(pbr_cache);
 
     // Build the test molecule's graph
     let mut molgraph = MolGraph::default();
@@ -181,7 +199,9 @@ pub fn init_molecule(
     let i2 = molgraph.add_node(initial_lone_pair);
 
     // Add a LonePair component to the entity so that it can track this
-    commands.entity(initial_lone_pair).insert(LonePair { graph_index: i2 });
+    commands
+        .entity(initial_lone_pair)
+        .insert(LonePair { graph_index: i2 });
 
     // Add a single bond between them
     molgraph.add_edge(i1, i2, 1);
