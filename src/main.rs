@@ -12,7 +12,7 @@ use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_mod_picking::prelude::*;
 
 use atomcad::camera::{pan_orbit_camera, PanOrbitCamera};
-use atomcad::molecule_builder::{molecule_builder, init_molecule, ClickFlag, Atom};
+use atomcad::molecule_builder::{molecule_builder, init_molecule};
 use atomcad::menubar::winit_menu_bar;
 use atomcad::APP_NAME;
 
@@ -40,14 +40,11 @@ fn main() {
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup(mut commands: Commands) {
     // camera
     let position = Vec3::new(0.0, 1.5, 6.0);
     let target = Vec3::ZERO;
+
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_translation(position).looking_at(target, Vec3::Y),
@@ -59,6 +56,7 @@ fn setup(
         },
         RaycastPickCamera::default(),
     ));
+
     // infinite grid
     commands.spawn(InfiniteGridBundle {
         grid: InfiniteGrid {
@@ -67,6 +65,7 @@ fn setup(
         transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..Default::default()
     });
+
     // light source
     commands.spawn(PointLightBundle {
         point_light: PointLight {
