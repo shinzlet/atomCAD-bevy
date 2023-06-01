@@ -81,8 +81,7 @@ pub fn molecule_builder(
     pbr_cache: Res<PbrCache>,
 ) {
     for (entity, parent, transform, clicked_lone_pair) in query.iter_mut() {
-        // Retrieve the parent of the clicked particle - i.e. the
-        // molecule graph.
+        // Retrieve the parent of the clicked particle - i.e. its molecule
         let molecule: &mut Molecule = q_parent.get_mut(parent.get()).unwrap().into_inner();
 
         let clicked_index = clicked_lone_pair.node_index;
@@ -91,7 +90,6 @@ pub fn molecule_builder(
         // (recall that we demand that all lone pairs have exactly one
         // neighbor)
         let bond_target = molecule.graph.neighbors(clicked_index).next().unwrap();
-
         molecule.graph.remove_node(clicked_index);
         commands.entity(entity).despawn();
 
