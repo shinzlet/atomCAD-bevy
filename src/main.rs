@@ -9,8 +9,10 @@ use bevy::{
 };
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_mod_picking::prelude::*;
 
 use atomcad::camera::{pan_orbit_camera, PanOrbitCamera};
+use atomcad::molecule_builder::{molecule_builder, init_molecule};
 use atomcad::menubar::winit_menu_bar;
 use atomcad::APP_NAME;
 
@@ -26,23 +28,23 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(DefaultPickingPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(InfiniteGridPlugin)
         .add_startup_system(winit_menu_bar)
         .add_startup_system(setup)
+        .add_startup_system(init_molecule)
         .add_system(ui_hello_world)
         .add_system(pan_orbit_camera)
+        .add_system(molecule_builder)
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup(mut commands: Commands) {
     // camera
     let position = Vec3::new(0.0, 1.5, 6.0);
     let target = Vec3::ZERO;
+
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_translation(position).looking_at(target, Vec3::Y),
@@ -52,27 +54,18 @@ fn setup(
             radius: (position - target).length(),
             ..Default::default()
         },
+        RaycastPickCamera::default(),
     ));
+
     // infinite grid
     commands.spawn(InfiniteGridBundle {
         grid: InfiniteGrid {
             ..Default::default()
         },
-        transform: Transform::from_xyz(0.0, -1.0, 0.0),
+        transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..Default::default()
     });
-    // torus
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Torus {
-            radius: 1.0,
-            subdivisions_segments: 4,
-            subdivisions_sides: 16,
-            ..default()
-        })),
-        material: materials.add(Color::rgb(0.2, 0.8, 0.4).into()),
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        ..default()
-    });
+
     // light source
     commands.spawn(PointLightBundle {
         point_light: PointLight {
@@ -83,6 +76,7 @@ fn setup(
         transform: Transform::from_xyz(-4.0, 8.0, 4.0),
         ..default()
     });
+
 }
 
 fn ui_hello_world(mut contexts: EguiContexts) {

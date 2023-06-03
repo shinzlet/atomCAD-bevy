@@ -34,6 +34,12 @@ eframe = { version = "0.21.3", default-features = false, features = [
     "wgpu",          # Use wgpu for rendering.
 ]}
 winit = "0.28.2"
+petgraph = "0.6.3"
+
+[dependencies.bevy_mod_picking]
+version = "0.13.0"
+default-features = false
+features = ["backend_raycast", "backend_bevy_ui", "backend_sprite", "selection", "highlight"]
 
 # macOS
 [target.'cfg(target_os = "macos")'.dependencies]

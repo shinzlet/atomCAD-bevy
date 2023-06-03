@@ -4,8 +4,10 @@
 
 pub mod camera;
 pub mod menubar;
+pub mod molecule_builder;
 pub mod platform;
 pub mod platform_impl;
+pub mod vsepr;
 
 pub const APP_NAME: &str = "atomCAD";
 
