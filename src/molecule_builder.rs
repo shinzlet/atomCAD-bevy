@@ -42,7 +42,7 @@ pub struct Atom {
     // relative to the world origin).
     // pos: Vec3,
     #[allow(dead_code)]
-    element: Element
+    element: Element,
 }
 
 /// The presence of this component means that an `Entity` models a bonding site in
@@ -130,7 +130,9 @@ pub fn molecule_builder(
         });
 
         // Add a single bond between the atom and new bonding site
-        molecule.graph.add_edge(new_atom_index, bonding_site_index, 1);
+        molecule
+            .graph
+            .add_edge(new_atom_index, bonding_site_index, 1);
 
         // Add a single bond between the old atom and this atom:
         molecule.graph.add_edge(new_atom_index, bond_target, 1);

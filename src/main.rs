@@ -12,8 +12,8 @@ use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_mod_picking::prelude::*;
 
 use atomcad::camera::{pan_orbit_camera, PanOrbitCamera};
-use atomcad::molecule_builder::{molecule_builder, init_molecule};
 use atomcad::menubar::winit_menu_bar;
+use atomcad::molecule_builder::{init_molecule, molecule_builder};
 use atomcad::APP_NAME;
 
 fn main() {
@@ -76,7 +76,6 @@ fn setup(mut commands: Commands) {
         transform: Transform::from_xyz(-4.0, 8.0, 4.0),
         ..default()
     });
-
 }
 
 fn ui_hello_world(mut contexts: EguiContexts) {
