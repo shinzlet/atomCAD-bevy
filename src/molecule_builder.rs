@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this file,
 // You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use crate::vsepr::BOND_SHAPES;
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 use periodic_table::Element;
@@ -79,69 +80,94 @@ pub fn molecule_builder(
     mut commands: Commands,
     mut query: Query<(Entity, &Parent, &Transform, &BondingSite), With<ClickFlag>>,
     mut q_parent: Query<&mut Molecule>,
+    q_pos: Query<&Transform>,
     pbr_cache: Res<PbrCache>,
 ) {
+    let pbr_cache = pbr_cache.into_inner();
     for (entity, parent, transform, clicked_bonding_site) in query.iter_mut() {
         // Retrieve the parent of the clicked particle - i.e. its molecule
         let molecule: &mut Molecule = q_parent.get_mut(parent.get()).unwrap().into_inner();
 
         let clicked_index = clicked_bonding_site.node_index;
 
-        // Get the atom this bonding site was connected to before removing it
-        // (recall that we demand that all bonding sites have exactly one
-        // neighbor)
+        // // Get the atom this bonding site was connected to before removing it
+        // // (recall that we demand that all bonding sites have exactly one
+        // // neighbor)
         let bond_target = molecule.graph.neighbors(clicked_index).next().unwrap();
         molecule.graph.remove_node(clicked_index);
         commands.entity(entity).despawn();
 
-        // Place a new atom
-        let mut new_atom = pbr_cache.atoms[&Element::Carbon].clone();
-        new_atom.transform = *transform;
-        let new_atom = commands
-            .spawn((
-                new_atom,
-                Atom {
-                    element: Element::Carbon,
-                },
-            ))
-            .id();
+        // The bonding sites are displayed quite close to the atom - because the
+        // atoms are larger, we extend this displacement and spawn the new atom further
+        // than the bonding site was located from its parent
+        let parent_tf = q_pos
+            .get(*molecule.graph.node_weight(bond_target).unwrap())
+            .unwrap();
+        let displacement = transform.translation - parent_tf.translation;
+        let new_atom_pos = transform.translation + displacement;
 
-        // Add a new binding site
-        let mut bonding_site = pbr_cache.bonding_site.clone();
-        bonding_site.transform = *transform;
-        bonding_site.transform.translation += Vec3::new(1.5, 0.0, 0.0);
-        let bonding_site = commands
-            .spawn((
-                bonding_site,
-                RaycastPickTarget::default(),
-                OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
-                    target_commands.insert(ClickFlag::default());
-                }),
-            ))
-            .id();
+        // We want the +z axis of this new atom to point from its center towards the atom it's bonded
+        // to
+        let up = -displacement.normalize();
 
-        // Store the graph indexes needed
-        let new_atom_index = molecule.graph.add_node(new_atom);
-        let bonding_site_index = molecule.graph.add_node(bonding_site);
+        spawn_atom(
+            &mut commands,
+            parent.get(),
+            &mut molecule.graph,
+            &pbr_cache,
+            false,
+            new_atom_pos,
+            up,
+        );
 
-        // Add a BondingSite component to the entity so that it can track this
-        commands.entity(bonding_site).insert(BondingSite {
-            node_index: bonding_site_index,
-        });
+        // // Place a new atom
+        // let mut new_atom = pbr_cache.atoms[&Element::Carbon].clone();
+        // new_atom.transform = *transform;
+        // let new_atom = commands
+        //     .spawn((
+        //         new_atom,
+        //         Atom {
+        //             element: Element::Carbon,
+        //         },
+        //     ))
+        //     .id();
 
-        // Add a single bond between the atom and new bonding site
-        molecule
-            .graph
-            .add_edge(new_atom_index, bonding_site_index, 1);
+        // // Add a new binding site
+        // let mut bonding_site = pbr_cache.bonding_site.clone();
+        // bonding_site.transform = *transform;
+        // bonding_site.transform.translation += Vec3::new(1.5, 0.0, 0.0);
+        // let bonding_site = commands
+        //     .spawn((
+        //         bonding_site,
+        //         RaycastPickTarget::default(),
+        //         OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
+        //             target_commands.insert(ClickFlag::default());
+        //         }),
+        //     ))
+        //     .id();
 
-        // Add a single bond between the old atom and this atom:
-        molecule.graph.add_edge(new_atom_index, bond_target, 1);
+        // // Store the graph indexes needed
+        // let new_atom_index = molecule.graph.add_node(new_atom);
+        // let bonding_site_index = molecule.graph.add_node(bonding_site);
 
-        commands
-            .entity(parent.get())
-            .push_children(&[new_atom, bonding_site]);
+        // // Add a BondingSite component to the entity so that it can track this
+        // commands.entity(bonding_site).insert(BondingSite {
+        //     node_index: bonding_site_index,
+        // });
 
-        println!("{:?}", molecule.graph);
+        // // Add a single bond between the atom and new bonding site
+        // molecule
+        //     .graph
+        //     .add_edge(new_atom_index, bonding_site_index, 1);
+
+        // // Add a single bond between the old atom and this atom:
+        // molecule.graph.add_edge(new_atom_index, bond_target, 1);
+
+        // commands
+        //     .entity(parent.get())
+        //     .push_children(&[new_atom, bonding_site]);
+
+        // println!("{:?}", molecule.graph);
     }
 }
 
@@ -155,8 +181,8 @@ pub fn init_molecule(
         bonding_site: PbrBundle {
             mesh: meshes.add(Mesh::from(shape::UVSphere {
                 radius: 0.3,
-                sectors: 8,
-                stacks: 8,
+                sectors: 14,
+                stacks: 14,
             })),
             material: materials.add(Color::rgb(0.8, 0.8, 0.8).into()),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
@@ -169,8 +195,8 @@ pub fn init_molecule(
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::UVSphere {
                 radius: 1.0,
-                sectors: 8,
-                stacks: 8,
+                sectors: 14,
+                stacks: 14,
             })),
             material: materials.add(Color::rgb(0.2, 0.2, 0.2).into()),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
@@ -178,53 +204,14 @@ pub fn init_molecule(
         },
     );
 
-    // Create an initial carbon atom
-    let carbon_pbr = pbr_cache.atoms[&Element::Carbon].clone();
-    let initial_carbon = commands
-        .spawn((
-            carbon_pbr,
-            Atom {
-                element: Element::Carbon,
-            },
-        ))
-        .id();
-
-    // Create a bonding site
-    let mut initial_bonding_site_pbr = pbr_cache.bonding_site.clone();
-    initial_bonding_site_pbr.transform.translation = Vec3::new(1.5, 0.0, 0.0);
-    let initial_bonding_site = commands
-        .spawn((
-            initial_bonding_site_pbr,
-            RaycastPickTarget::default(),
-            OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
-                target_commands.insert(ClickFlag::default());
-            }),
-        ))
-        .id();
-
-    commands.insert_resource(pbr_cache);
-
     // Build the test molecule's graph
     let mut molgraph = MolGraph::default();
-
-    // Store the graph indexes needed
-    let i1 = molgraph.add_node(initial_carbon);
-    let i2 = molgraph.add_node(initial_bonding_site);
-
-    // Add a BondingSite component to the entity so that it can track this
-    commands
-        .entity(initial_bonding_site)
-        .insert(BondingSite { node_index: i2 });
-
-    // Add a single bond between them
-    molgraph.add_edge(i1, i2, 1);
-    println!("{:?}", molgraph);
 
     // Create a molecule entity backed by the molecule graph - this
     // will allow us to use the ECS as a molecule database and give us
     // unique identifiers for each molecule
     let mut molecule = commands.spawn((
-        Molecule { graph: molgraph },
+        // Molecule { graph: molgraph },
         // A Visibility and ComputedVisibility are needed to make
         // the children of the molecule (the atoms) render. A transform
         // and global transform are needed for the child entities to
@@ -236,9 +223,90 @@ pub fn init_molecule(
         Transform::default(),
     ));
 
-    // Make the displayed atom gameobjects children of the molecule, allowing
-    // the molecule to be recovered when an atom is picked
-    molecule.push_children(&[initial_carbon, initial_bonding_site]);
+    let molecule_id = molecule.id();
+    spawn_atom(
+        molecule.commands(),
+        molecule_id,
+        &mut molgraph,
+        &pbr_cache,
+        true,
+        Vec3::default(),
+        Vec3::new(0.0, 0.0, 1.0),
+    );
+
+    molecule.insert(Molecule { graph: molgraph });
+
+    // Give ownership of the pbr cache to the ECS
+    commands.insert_resource(pbr_cache);
 }
 
 // End of File
+fn spawn_atom(
+    commands: &mut Commands,
+    molecule: Entity,
+    molgraph: &mut MolGraph,
+    pbr_cache: &PbrCache,
+    skip_first_bonding_site: bool,
+    position: Vec3,
+    up: Vec3,
+) {
+    // Create a quaternion that will rotate from the global +z vector to the
+    // up vector
+    let up_rotation = Quat::from_rotation_arc(Vec3::new(0.0, 0.0, 1.0), up);
+
+    // Create an initial carbon atom
+    let mut carbon_pbr = pbr_cache.atoms[&Element::Carbon].clone();
+    carbon_pbr.transform.translation = position;
+    let initial_carbon = commands
+        .spawn((
+            carbon_pbr,
+            Atom {
+                element: Element::Carbon,
+            },
+        ))
+        .id();
+    let carbon_node = molgraph.add_node(initial_carbon);
+
+    // Make the displayed particles gameobjects children of the molecule, allowing
+    // the molecule to be recovered when a particle is picked
+    commands.entity(molecule).add_child(initial_carbon);
+
+    // Create bonding sites
+    let mut angle_iter = BOND_SHAPES[5].unwrap().into_iter();
+    if skip_first_bonding_site {
+        angle_iter.next();
+    }
+
+    for angles in angle_iter {
+        let mut bonding_site_pbr = pbr_cache.bonding_site.clone();
+        let mut displacement = 1.0
+            * Vec3 {
+                x: angles.azimuthal.cos() * angles.polar.sin(),
+                y: angles.azimuthal.sin() * angles.polar.sin(),
+                z: angles.polar.cos(),
+            };
+        displacement = up_rotation * displacement;
+        bonding_site_pbr.transform.translation = position + displacement;
+
+        let bonding_site = commands
+            .spawn((
+                bonding_site_pbr,
+                RaycastPickTarget::default(),
+                OnPointer::<Click>::target_commands_mut(|_click, target_commands| {
+                    target_commands.insert(ClickFlag::default());
+                }),
+            ))
+            .id();
+
+        // Store the graph indexes needed
+        let bonding_site_node = molgraph.add_node(bonding_site);
+        molgraph.add_edge(carbon_node, bonding_site_node, 1);
+
+        // Add a BondingSite component to the entity so that it can track this
+        commands.entity(bonding_site).insert(BondingSite {
+            node_index: bonding_site_node,
+        });
+
+        commands.entity(molecule).add_child(bonding_site);
+    }
+}
