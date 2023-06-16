@@ -35,6 +35,7 @@ eframe = { version = "0.21.3", default-features = false, features = [
 ]}
 winit = "0.28.2"
 petgraph = "0.6.3"
+bevy_prototype_debug_lines = { version = "0.10", features = ["3d"] }
 
 [dependencies.bevy_mod_picking]
 version = "0.13.0"

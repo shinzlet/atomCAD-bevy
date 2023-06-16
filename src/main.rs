@@ -10,10 +10,11 @@ use bevy::{
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGrid, InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_mod_picking::prelude::*;
+use bevy_prototype_debug_lines::*;
 
 use atomcad::camera::{pan_orbit_camera, PanOrbitCamera};
 use atomcad::menubar::winit_menu_bar;
-use atomcad::molecule_builder::{init_molecule, molecule_builder};
+use atomcad::molecule_builder::{init_molecule, relax, track_particles};
 use atomcad::APP_NAME;
 
 fn main() {
@@ -31,12 +32,14 @@ fn main() {
         .add_plugins(DefaultPickingPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(InfiniteGridPlugin)
+        .add_plugin(DebugLinesPlugin::with_depth_test(true))
         .add_startup_system(winit_menu_bar)
         .add_startup_system(setup)
         .add_startup_system(init_molecule)
         .add_system(ui_hello_world)
         .add_system(pan_orbit_camera)
-        .add_system(molecule_builder)
+        .add_system(track_particles)
+        .add_system(relax)
         .run();
 }
 
